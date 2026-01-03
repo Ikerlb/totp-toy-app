@@ -28,8 +28,10 @@ export function UsernameForm({ onSubmit }: UsernameFormProps) {
           placeholder="Enter username"
           autoFocus
         />
-        <button type="submit" disabled={!username.trim()}>
-          Continue
+        <button type="submit" disabled={!username.trim()} aria-label="Continue">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
         </button>
       </div>
     </form>
