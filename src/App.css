@@ -252,6 +252,10 @@
   font-size: 0.875rem;
 }
 
+.step-content .hex-display code {
+  word-break: break-all;
+}
+
 .step-content .hmac-display code {
   font-size: 0.875rem;
 }

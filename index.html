@@ -5,6 +5,22 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>toy-otp</title>
+    <script>
+      // Polyfill for libraries that need buffer/Buffer globals
+      window.global = window;
+      window.buffer = window.buffer || {};
+      window.Buffer = window.Buffer || {
+        from: function(data, encoding) {
+          if (typeof data === 'string') {
+            var encoder = new TextEncoder();
+            return encoder.encode(data);
+          }
+          return new Uint8Array(data);
+        },
+        isBuffer: function() { return false; }
+      };
+      window.buffer.Buffer = window.Buffer;
+    </script>
   </head>
   <body>
     <div id="root"></div>
