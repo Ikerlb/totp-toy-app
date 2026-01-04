@@ -42,71 +42,12 @@
   text-align: center;
 }
 
-/* Username Form */
-.username-form {
-  max-width: 400px;
-  margin: 0 auto;
-  padding: 2rem;
-  background: #1a1a1a;
-  border-radius: 12px;
-}
 
-.username-form h2 {
-  margin: 0 0 0.5rem;
-}
-
-.username-form .description {
-  color: #888;
-  margin-bottom: 1.5rem;
-}
-
-.input-group {
-  position: relative;
-}
-
-.input-group input {
-  width: 100%;
-  padding: 0.75rem 3rem 0.75rem 1rem;
-  font-size: 1rem;
-  border: 1px solid #333;
-  border-radius: 6px;
-  background: #242424;
-  color: white;
-}
-
-.input-group button {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
+/* Config Bar */
+.config-bar {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  background: #646cff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.input-group button:hover:not(:disabled) {
-  background: #535bf2;
-}
-
-.input-group button:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-/* User Bar */
-.user-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
   padding: 1rem;
   background: #1a1a1a;
   border-radius: 8px;
@@ -116,28 +57,73 @@
   margin-right: auto;
 }
 
-.badge.new {
-  background: #22c55e;
-  color: white;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  margin-left: 0.5rem;
+.config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
-.logout-button {
-  padding: 0.5rem 1rem;
-  background: transparent;
-  border: 1px solid #444;
+.config-field label {
+  font-size: 0.75rem;
   color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.config-field input {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #242424;
+  color: white;
+}
+
+.config-field input:focus {
+  outline: none;
+  border-color: #646cff;
+}
+
+.config-field-secret {
+  flex: 1;
+  min-width: 200px;
+}
+
+.config-field-secret input {
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 0.75rem;
+}
+
+.config-field-secret {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.config-field-secret label {
+  width: 100%;
+}
+
+.config-field-secret input {
+  flex: 1;
+  min-width: 150px;
+}
+
+.generate-button {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  background: #646cff;
+  color: white;
+  border: none;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s;
+  white-space: nowrap;
 }
 
-.logout-button:hover {
-  border-color: #666;
-  color: white;
+.generate-button:hover {
+  background: #535bf2;
 }
 
 /* Content Grid */
