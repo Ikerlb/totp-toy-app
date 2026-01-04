@@ -8,14 +8,17 @@ interface TOTPVisualizerProps {
 }
 
 export function TOTPVisualizer({ secret }: TOTPVisualizerProps) {
-  const [steps, setSteps] = useState<TOTPSteps>(() => generateTOTPSteps(secret));
-  const [prevOTP, setPrevOTP] = useState(steps.otp);
+  const [steps, setSteps] = useState<TOTPSteps | null>(null);
+  const [prevOTP, setPrevOTP] = useState<string>("");
   const [highlight, setHighlight] = useState(false);
   const [showOTP, setShowOTP] = useState(false);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const newSteps = generateTOTPSteps(secret);
+    // Initial load
+    generateTOTPSteps(secret).then(setSteps);
+
+    const interval = setInterval(async () => {
+      const newSteps = await generateTOTPSteps(secret);
       setSteps(newSteps);
 
       // Highlight when OTP changes
@@ -28,6 +31,10 @@ export function TOTPVisualizer({ secret }: TOTPVisualizerProps) {
 
     return () => clearInterval(interval);
   }, [secret, prevOTP]);
+
+  if (!steps) {
+    return <div className="totp-visualizer">Loading...</div>;
+  }
 
   return (
     <div className="totp-visualizer">

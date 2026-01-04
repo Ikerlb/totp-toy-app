@@ -1,10 +1,73 @@
 import { authenticator } from "@otplib/preset-browser";
 
-// Configure otplib
-authenticator.options = {
+// Fix for browser preset's broken createRandomBytes and keyEncoder
+function createRandomBytes(size: number): string {
+  const bytes = new Uint8Array(size);
+  crypto.getRandomValues(bytes);
+  // Return hex string
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+// Base32 encode (RFC 4648)
+function base32Encode(bytes: number[]): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const byte of bytes) {
+    bits += byte.toString(2).padStart(8, "0");
+  }
+  let result = "";
+  for (let i = 0; i < bits.length; i += 5) {
+    const chunk = bits.substring(i, i + 5).padEnd(5, "0");
+    result += alphabet[parseInt(chunk, 2)];
+  }
+  return result;
+}
+
+// keyEncoder: convert hex string to base32
+function keyEncoder(secret: string, _encoding: string): string {
+  // secret is a hex string, convert to bytes then base32
+  const bytes: number[] = [];
+  for (let i = 0; i < secret.length; i += 2) {
+    bytes.push(parseInt(secret.substring(i, i + 2), 16));
+  }
+  return base32Encode(bytes);
+}
+
+// Base32 decode (RFC 4648)
+function base32DecodeToBytes(base32: string): Uint8Array {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const char of base32.toUpperCase()) {
+    const val = alphabet.indexOf(char);
+    if (val >= 0) {
+      bits += val.toString(2).padStart(5, "0");
+    }
+  }
+  const bytes = new Uint8Array(Math.floor(bits.length / 8));
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(bits.substring(i * 8, i * 8 + 8), 2);
+  }
+  return bytes;
+}
+
+// keyDecoder: convert base32 to hex string
+function keyDecoder(encodedSecret: string, _encoding: string): string {
+  const bytes = base32DecodeToBytes(encodedSecret);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+// Configure otplib with fixed functions
+(authenticator as any).options = {
   digits: 6,
   step: 30,
   window: 1,
+  createRandomBytes,
+  keyEncoder,
+  keyDecoder,
 };
 
 export interface TOTPSteps {
@@ -50,15 +113,47 @@ function base32ToHex(base32: string): string {
   return hex.toUpperCase();
 }
 
-// Simplified HMAC-SHA1 for educational display
-// In reality, otplib handles this internally
-function computeHmacDisplay(secretHex: string, counterHex: string): string {
-  // This is a simplified representation for educational purposes
-  // The actual HMAC-SHA1 computation happens inside otplib
-  return `HMAC-SHA1(${secretHex.substring(0, 8)}..., ${counterHex})`;
+// Convert hex string to Uint8Array
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+  }
+  return bytes;
 }
 
-export function generateTOTPSteps(secret: string): TOTPSteps {
+// Convert base32 secret to Uint8Array using our keyDecoder (same as otplib)
+function base32ToBytes(base32String: string): Uint8Array {
+  const hex = keyDecoder(base32String, "hex");
+  return hexToBytes(hex);
+}
+
+// Safely extract ArrayBuffer from Uint8Array (handles views correctly)
+function toArrayBuffer(arr: Uint8Array): ArrayBuffer {
+  return arr.buffer.slice(arr.byteOffset, arr.byteOffset + arr.byteLength) as ArrayBuffer;
+}
+
+// Compute HMAC-SHA1 using Web Crypto API
+async function computeHmacSha1(secret: Uint8Array, counter: Uint8Array): Promise<Uint8Array> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    toArrayBuffer(secret),
+    { name: "HMAC", hash: "SHA-1" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, toArrayBuffer(counter));
+  return new Uint8Array(signature);
+}
+
+// Convert bytes to hex string for display
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0").toUpperCase())
+    .join("");
+}
+
+export async function generateTOTPSteps(secret: string): Promise<TOTPSteps> {
   const now = Math.floor(Date.now() / 1000);
   const step = 30;
   const timeCounter = Math.floor(now / step);
@@ -67,21 +162,46 @@ export function generateTOTPSteps(secret: string): TOTPSteps {
   // Convert secret to hex for display
   const secretHex = base32ToHex(secret);
 
-  // Time counter as 8-byte hex
+  // Time counter as 8-byte big-endian
   const timeCounterHex = timeCounter.toString(16).toUpperCase().padStart(16, "0");
+  // Use BigInt for correct 64-bit handling (JS bitshift wraps at 32 bits)
+  const counterBigInt = BigInt(timeCounter);
+  const counterBytes = new Uint8Array(8);
+  for (let i = 0; i < 8; i++) {
+    counterBytes[7 - i] = Number((counterBigInt >> BigInt(i * 8)) & 0xffn);
+  }
 
-  // Generate the actual OTP using otplib
-  const otp = authenticator.generate(secret);
+  // Compute the actual HMAC-SHA1
+  const secretBytes = base32ToBytes(secret);
+  const hmacResult = await computeHmacSha1(secretBytes, counterBytes);
+  const hmacHex = bytesToHex(hmacResult);
 
-  // The offset is the last nibble of the HMAC result (0-15)
-  // We'll show a representative value
-  const offset = timeCounter % 16;
+  // Dynamic truncation: offset is the last nibble (4 bits) of the hash
+  const offset = hmacResult[19] & 0x0f;
 
-  // Truncated hash representation
-  const truncatedHash = `[bytes ${offset}-${offset + 3}]`;
+  // Extract 4 bytes starting at offset and mask the high bit
+  const truncatedValue =
+    ((hmacResult[offset] & 0x7f) << 24) |
+    ((hmacResult[offset + 1] & 0xff) << 16) |
+    ((hmacResult[offset + 2] & 0xff) << 8) |
+    (hmacResult[offset + 3] & 0xff);
 
-  // The truncated value before modulo 10^6
-  const truncatedValue = parseInt(otp, 10) + Math.floor(Math.random() * 1000000) * 1000000;
+  // Truncated hash representation showing the actual bytes
+  const truncatedBytes = hmacHex.substring(offset * 2, (offset + 4) * 2);
+
+  // Compute OTP: truncatedValue mod 10^6, padded to 6 digits
+  const otp = (truncatedValue % 1000000).toString().padStart(6, "0");
+
+  // Debug: verify against otplib
+  const otplibOtp = authenticator.generate(secret);
+
+  if (otp !== otplibOtp) {
+    console.warn(`OTP mismatch! Ours: ${otp}, otplib: ${otplibOtp}`);
+    console.warn(`Secret bytes (${secretBytes.length}): ${bytesToHex(secretBytes)}`);
+    console.warn(`Counter bytes (${counterBytes.length}): ${bytesToHex(counterBytes)}`);
+    console.warn(`HMAC: ${hmacHex}`);
+    console.warn(`Offset: ${offset}, TruncatedValue: ${truncatedValue}`);
+  }
 
   return {
     secret,
@@ -91,9 +211,9 @@ export function generateTOTPSteps(secret: string): TOTPSteps {
     timeCounter,
     timeCounterHex,
     hmacInput: `Secret + Counter(${timeCounterHex})`,
-    hmacOutput: computeHmacDisplay(secretHex, timeCounterHex),
+    hmacOutput: hmacHex,
     offset,
-    truncatedHash,
+    truncatedHash: truncatedBytes,
     truncatedValue,
     otp,
   };
