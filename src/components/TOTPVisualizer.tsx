@@ -97,6 +97,9 @@ export function TOTPVisualizer({ secret }: TOTPVisualizerProps) {
           <span className="step-title">HMAC-SHA1 Hash</span>
         </div>
         <div className="step-content">
+          <div className="formula">
+            HMAC-SHA1(<code className="secret">{steps.secretHex}</code>, <code>{steps.timeCounterHex}</code>) =
+          </div>
           <div className="hmac-display">
             <code>{steps.hmacOutput}</code>
           </div>
